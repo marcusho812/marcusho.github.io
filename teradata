@@ -1,0 +1,44 @@
+REPLACE PROCEDURE GetDistinctValues(IN TableName VARCHAR(128))
+BEGIN
+    -- Declare variables
+    DECLARE ColumnName VARCHAR(128);
+    DECLARE SqlString VARCHAR(5000);
+    DECLARE SqlCursor CURSOR FOR SqlStmt;
+
+    -- Temporary table to store distinct values
+    DECLARE GLOBAL TEMPORARY TABLE DistinctValues (
+        ColumnName VARCHAR(128),
+        DistinctValue VARCHAR(5000)
+    ) ON COMMIT PRESERVE ROWS;
+
+    -- Prepare statement to select column names
+    DECLARE SqlStmt AS 'SELECT ColumnName FROM DBC.ColumnsV WHERE TableName = ? ORDER BY ColumnName';
+
+    -- Open cursor
+    OPEN SqlCursor;
+
+    -- Loop through columns
+    LABEL LOOP_THROUGH_COLUMNS:
+    LOOP
+        FETCH SqlCursor INTO ColumnName;
+        IF (SqlCursor%NOTFOUND) THEN
+            LEAVE LOOP_THROUGH_COLUMNS;
+        END IF;
+
+        -- Prepare SQL to get distinct values
+        SET SqlString = 'INSERT INTO DistinctValues SELECT ''' || TRIM(ColumnName) || ''', CAST(' || TRIM(ColumnName) || ' AS VARCHAR(5000)) FROM ' || TRIM(TableName) || ' GROUP BY ' || TRIM(ColumnName);
+
+        -- Execute the SQL
+        EXECUTE IMMEDIATE SqlString;
+    END LOOP LOOP_THROUGH_COLUMNS;
+
+    -- Close cursor
+    CLOSE SqlCursor;
+
+    -- Select results from temporary table
+    SELECT * FROM DistinctValues;
+
+    -- Drop the temporary table
+    DROP TABLE DistinctValues;
+END;
+
